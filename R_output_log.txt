@@ -1,0 +1,310 @@
+
+> # Load your cleaned data from Step 1
+> data <- read_csv("cleaned_data_2016.csv")
+indexing cleaned_data_2016.csv [=========================================] 4.27GB/s, eta:  0s                                                                                             
+> # 1. Summary Statistics Table
+> summary_vars <- data %>%
++   select(co2_pc, gdp_pc, renew_share, ind_share, ln_co2, ln_gdp, ln_gdp_squared)
+
+> stargazer(as.data.frame(summary_vars), 
++           type = "text", 
++           title = "Summary Statistics", 
++           digits = 2, 
++            .... [TRUNCATED] 
+
+Summary Statistics
+========================================================
+Statistic       N    Mean    St. Dev.   Min      Max    
+--------------------------------------------------------
+co2_pc         196   4.97      6.16     0.03    36.97   
+gdp_pc         196 15,515.93 22,480.74 232.94 165,375.50
+renew_share    196   29.49     27.51    0.00    96.61   
+ind_share      196   24.18     9.96     5.35    57.29   
+ln_co2         196   0.80      1.47    -3.45     3.61   
+ln_gdp         196   8.73      1.44     5.45    12.02   
+ln_gdp_squared 196   78.32     25.33   29.71    144.38  
+--------------------------------------------------------
+
+> # 2. Histograms to justify log transformation
+> ggplot(data, aes(x = co2_pc)) +
++   geom_histogram(fill = "steelblue", bins = 30) +
++   labs(title = .... [TRUNCATED] 
+
+> ggsave("hist_raw_co2.png", width = 6, height = 4, dpi = 300)
+
+> ggplot(data, aes(x = ln_co2)) +
++   geom_histogram(fill = "darkgreen", bins = 30) +
++   labs(title = "Histogram of Logged CO2 per Capita", x = "ln(C ..." ... [TRUNCATED] 
+
+> ggsave("hist_log_co2.png", width = 6, height = 4, dpi = 300)
+
+> # 3. EKC Scatter Plot with Quadratic Fit
+> ggplot(data, aes(x = ln_gdp, y = ln_co2)) +
++   geom_point(alpha = 0.5, color = "steelblue") +
++   geom_s .... [TRUNCATED] 
+
+> ggsave("ekc_plot.png", width = 8, height = 6, dpi = 300)
+
+> # Model 1: Baseline (Simple linear relationship)
+> model1 <- lm(ln_co2 ~ ln_gdp, data = data)
+
+> summary(model1)
+
+Call:
+lm(formula = ln_co2 ~ ln_gdp, data = data)
+
+Residuals:
+     Min       1Q   Median       3Q      Max 
+-2.31997 -0.45260 -0.05993  0.47713  1.83097 
+
+Coefficients:
+            Estimate Std. Error t value Pr(>|t|)    
+(Intercept) -6.90141    0.32528  -21.22   <2e-16 ***
+ln_gdp       0.88231    0.03676   24.00   <2e-16 ***
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 0.7416 on 194 degrees of freedom
+Multiple R-squared:  0.7481,	Adjusted R-squared:  0.7468 
+F-statistic: 576.2 on 1 and 194 DF,  p-value: < 2.2e-16
+
+
+> # Model 2: The EKC Test (Adding the squared term)
+> model2 <- lm(ln_co2 ~ ln_gdp + ln_gdp_squared, data = data)
+
+> summary(model2)
+
+Call:
+lm(formula = ln_co2 ~ ln_gdp + ln_gdp_squared, data = data)
+
+Residuals:
+    Min      1Q  Median      3Q     Max 
+-1.2412 -0.4403 -0.0779  0.3577  2.1188 
+
+Coefficients:
+                Estimate Std. Error t value Pr(>|t|)    
+(Intercept)    -19.95699    1.54363 -12.929  < 2e-16 ***
+ln_gdp           3.95598    0.35887  11.023  < 2e-16 ***
+ln_gdp_squared  -0.17598    0.02047  -8.598 2.77e-15 ***
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 0.6323 on 193 degrees of freedom
+Multiple R-squared:  0.8179,	Adjusted R-squared:  0.816 
+F-statistic: 433.4 on 2 and 193 DF,  p-value: < 2.2e-16
+
+
+> # Model 3: Full model with controls (Renewable + Industry)
+> model3 <- lm(ln_co2 ~ ln_gdp + ln_gdp_squared + renew_share + ind_share, data = data)
+
+> summary(model3)
+
+Call:
+lm(formula = ln_co2 ~ ln_gdp + ln_gdp_squared + renew_share + 
+    ind_share, data = data)
+
+Residuals:
+     Min       1Q   Median       3Q      Max 
+-1.32889 -0.30955 -0.04413  0.27244  1.68997 
+
+Coefficients:
+                 Estimate Std. Error t value Pr(>|t|)    
+(Intercept)    -10.468240   1.524731  -6.866 9.03e-11 ***
+ln_gdp           1.922534   0.337871   5.690 4.71e-08 ***
+ln_gdp_squared  -0.071300   0.018638  -3.826 0.000177 ***
+renew_share     -0.017600   0.001874  -9.393  < 2e-16 ***
+ind_share        0.024281   0.003589   6.766 1.58e-10 ***
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 0.4915 on 191 degrees of freedom
+Multiple R-squared:  0.8911,	Adjusted R-squared:  0.8888 
+F-statistic: 390.7 on 4 and 191 DF,  p-value: < 2.2e-16
+
+
+> # Model 3 with Robust Standard Errors (Crucial for correct inference)
+> coeftest(model3, vcov = vcovHC(model3, type = "HC1"))
+
+t test of coefficients:
+
+                  Estimate  Std. Error t value  Pr(>|t|)    
+(Intercept)    -10.4682401   1.7635313 -5.9360 1.353e-08 ***
+ln_gdp           1.9225341   0.3881451  4.9531 1.602e-06 ***
+ln_gdp_squared  -0.0713000   0.0213108 -3.3457 0.0009881 ***
+renew_share     -0.0175998   0.0023307 -7.5513 1.729e-12 ***
+ind_share        0.0242812   0.0035763  6.7894 1.384e-10 ***
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+
+> # Calculate the turning point from Model 3
+> b1 <- coef(model3)["ln_gdp"]
+
+> b2 <- coef(model3)["ln_gdp_squared"]
+
+> turning_point <- exp(-b1 / (2 * b2))
+
+> print(paste("Turning point (USD GDP per capita):", round(turning_point, 2)))
+[1] "Turning point (USD GDP per capita): 716406.95"
+
+> # plotting EKC from model 3
+> ggplot(data, aes(x = ln_gdp, y = ln_co2)) +
++   geom_point(alpha = 0.5, color = "steelblue") +
++   geom_smooth(method  .... [TRUNCATED] 
+
+> ggsave("ekc_plot.png", width = 8, height = 6, dpi = 300)
+
+> stargazer(model1, model2, model3, 
++           type = "text",
++           title = "Regression Results for the EKC (2016)",
++           column.labels .... [TRUNCATED] 
+
+Regression Results for the EKC (2016)
+==============================================================================================
+                                               Dependent variable:                            
+                    --------------------------------------------------------------------------
+                                                      ln_co2                                  
+                            Baseline                   EKC                 With Controls      
+                              (1)                      (2)                      (3)           
+----------------------------------------------------------------------------------------------
+Log GDP per Capita          0.882***                 3.956***                 1.923***        
+                            (0.037)                  (0.359)                  (0.338)         
+                                                                                              
+Log GDP Squared                                     -0.176***                -0.071***        
+                                                     (0.020)                  (0.019)         
+                                                                                              
+Renewable Share                                                              -0.018***        
+                                                                              (0.002)         
+                                                                                              
+Industry Share                                                                0.024***        
+                                                                              (0.004)         
+                                                                                              
+Constant                   -6.901***                -19.957***               -10.468***       
+                            (0.325)                  (1.544)                  (1.525)         
+                                                                                              
+----------------------------------------------------------------------------------------------
+Observations                  196                      196                      196           
+R2                           0.748                    0.818                    0.891          
+Adjusted R2                  0.747                    0.816                    0.889          
+Residual Std. Error     0.742 (df = 194)         0.632 (df = 193)         0.492 (df = 191)    
+F Statistic         576.229*** (df = 1; 194) 433.366*** (df = 2; 193) 390.668*** (df = 4; 191)
+==============================================================================================
+Note:                                                              *p<0.1; **p<0.05; ***p<0.01
+
+> # Model 4 with OECD Dummy
+> # Create the dummy variable for OECD (Global North proxy)
+> oecd_countries <- c("AUT", "AUS", "BEL", "CAN", "CHL", "COL" .... [TRUNCATED] 
+
+> data <- data %>%
++   mutate(global_north = ifelse(Code %in% oecd_countries, 1, 0))
+
+> model4 <- lm(ln_co2 ~ ln_gdp * global_north + ln_gdp_squared * global_north + renew_share + ind_share, data = data)
+
+> summary(model4)
+
+Call:
+lm(formula = ln_co2 ~ ln_gdp * global_north + ln_gdp_squared * 
+    global_north + renew_share + ind_share, data = data)
+
+Residuals:
+     Min       1Q   Median       3Q      Max 
+-1.31271 -0.31532 -0.02598  0.30000  1.71255 
+
+Coefficients:
+                              Estimate Std. Error t value Pr(>|t|)    
+(Intercept)                 -10.870919   1.605819  -6.770 1.60e-10 ***
+ln_gdp                        2.036445   0.361240   5.637 6.25e-08 ***
+global_north                 -8.743930  16.843739  -0.519 0.604287    
+ln_gdp_squared               -0.078953   0.020298  -3.890 0.000139 ***
+renew_share                  -0.017882   0.001934  -9.248  < 2e-16 ***
+ind_share                     0.024360   0.003604   6.759 1.70e-10 ***
+ln_gdp:global_north           1.593758   3.322504   0.480 0.632009    
+global_north:ln_gdp_squared  -0.071312   0.163398  -0.436 0.663025    
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 0.4935 on 188 degrees of freedom
+Multiple R-squared:  0.8919,	Adjusted R-squared:  0.8879 
+F-statistic: 221.7 on 7 and 188 DF,  p-value: < 2.2e-16
+
+
+> # Tests and Residuals
+> # 1. Breusch-Pagan Test for Heteroskedasticity
+> bptest(model3)
+
+	studentized Breusch-Pagan test
+
+data:  model3
+BP = 5.8106, df = 4, p-value = 0.2137
+
+
+> # 2. VIF for Multicollinearity
+> vif(model3)
+        ln_gdp ln_gdp_squared    renew_share      ind_share 
+    192.392338     179.956481       2.144436       1.031128 
+
+> # 3. Diagnostic Plots (2x2 grid)
+> png("residual_plots.png", width = 800, height = 800)
+
+> par(mfrow = c(2, 2))
+
+> plot(model3)
+
+> par(mfrow = c(1, 1))
+
+> dev.off()
+RStudioGD 
+        2 
+
+> robust_se_list <- list(
++   sqrt(diag(vcovHC(model1, type = "HC1"))),
++   sqrt(diag(vcovHC(model2, type = "HC1"))),
++   sqrt(diag(vcovHC(model3, typ .... [TRUNCATED] 
+
+> # Regression Table
+> stargazer(model1, model2, model3, model4, 
++           type = "text",
++           title = "Regression Results for the EKC (2016 ..." ... [TRUNCATED] 
+
+Regression Results for the EKC (2016)
+=======================================================================================================================
+                                                            Dependent variable:                                        
+                    ---------------------------------------------------------------------------------------------------
+                                                                  ln_co2                                               
+                            Baseline                 EKC Only              With Controls          Global North Int.    
+                              (1)                      (2)                      (3)                      (4)           
+-----------------------------------------------------------------------------------------------------------------------
+Log GDP                     0.882***                 3.956***                 1.923***                 2.036***        
+                            (0.044)                  (0.372)                  (0.388)                  (0.416)         
+                                                                                                                       
+Log GDP Squared                                                                                         -8.744         
+                                                                                                       (12.948)        
+                                                                                                                       
+Renewable Share                                     -0.176***                -0.071***                -0.079***        
+                                                     (0.021)                  (0.021)                  (0.023)         
+                                                                                                                       
+Industry Share                                                               -0.018***                -0.018***        
+                                                                              (0.002)                  (0.002)         
+                                                                                                                       
+Global North                                                                  0.024***                 0.024***        
+                                                                              (0.004)                  (0.004)         
+                                                                                                                       
+Log GDP x North                                                                                         1.594          
+                                                                                                       (2.628)         
+                                                                                                                       
+Log GDP Sq x North                                                                                      -0.071         
+                                                                                                       (0.133)         
+                                                                                                                       
+Constant                   -6.901***                -19.957***               -10.468***               -10.871***       
+                            (0.388)                  (1.616)                  (1.764)                  (1.859)         
+                                                                                                                       
+-----------------------------------------------------------------------------------------------------------------------
+Observations                  196                      196                      196                      196           
+R2                           0.748                    0.818                    0.891                    0.892          
+Adjusted R2                  0.747                    0.816                    0.889                    0.888          
+Residual Std. Error     0.742 (df = 194)         0.632 (df = 193)         0.492 (df = 191)         0.493 (df = 188)    
+F Statistic         576.229*** (df = 1; 194) 433.366*** (df = 2; 193) 390.668*** (df = 4; 191) 221.679*** (df = 7; 188)
+=======================================================================================================================
+Note:                                                                                       *p<0.1; **p<0.05; ***p<0.01
+
+> sink()
